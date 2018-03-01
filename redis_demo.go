@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/luci/go-render/render"
 )
 
 var pool *redis.Pool
@@ -24,29 +23,67 @@ func main() {
 	c := pool.Get()
 	defer c.Close()
 
-	_, err := c.Do("HMSET", "top10", "three", "heqikuang", "four", "xuefengfei")
-	if err != nil {
-		fmt.Println(err)
-		return
+	/*
+		_, err := c.Do("HMSET", "top10", "three", "heqikuang", "four", "xuefengfei")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		//values, err := redis.Values(c.Do("HMGET", "top10", "three", "four"))
+		values, err := redis.Values(c.Do("HGETALL", "top10"))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println("value : " + render.Render(values))
+
+		var rankList []struct {
+			Rank string
+			Name string
+		}
+
+		//if _, err = redis.Scan(values, &name1, &name2); err != nil {
+		if err = redis.ScanSlice(values, &rankList); err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println("nameList ", render.Render(rankList))
+	*/
+	var p1, p2 struct {
+		Title  string `redis:"title"`
+		Author string `redis:"author"`
+		Body   string `redis:"body"`
 	}
 
-	//values, err := redis.Values(c.Do("HMGET", "top10", "three", "four"))
-	values, err := redis.Values(c.Do("HGETALL", "top10"))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("value : " + render.Render(values))
+	p1.Title = "Example"
+	p1.Author = "Gary"
+	p1.Body = "Hello"
 
-	var rankList []struct {
-		Rank string
-		Name string
+	if _, err := c.Do("HMSET", redis.Args{}.Add("id1").AddFlat(&p1)...); err != nil {
+		panic(err)
 	}
 
-	//if _, err = redis.Scan(values, &name1, &name2); err != nil {
-	if err = redis.ScanSlice(values, &rankList); err != nil {
-		fmt.Println(err)
+	m := map[string]string{
+		"title":  "Example2",
+		"author": "Steve",
+		"body":   "Map",
+	}
+	if _, err := c.Do("HMSET", redis.Args{}.Add("id2").AddFlat(m)...); err != nil {
+		panic(err)
 	}
 
-	fmt.Println("nameList ", render.Render(rankList))
+	for _, id := range []string{"id1", "id2"} {
+
+		v, err := redis.Values(c.Do("HGETALL", id))
+		if err != nil {
+			panic(err)
+		}
+
+		if err := redis.ScanStruct(v, &p2); err != nil {
+			panic(err)
+		}
+
+		fmt.Printf("%+v\n", p2)
+	}
 }
